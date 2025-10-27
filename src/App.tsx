@@ -1,6 +1,6 @@
 'use client'
 import { useState } from "react"
-import { RedditStatsResults, generateMockStats } from "./components/reddit-stats-results"
+import { RedditStatsResults } from "./components/reddit-stats-results"
 import { BloombergClockSystem } from "./components/bloomberg-clock-system"
 import { BloombergLoading } from "./components/bloomberg-loading"
 import { CRMPage } from "./components/crm-page"
