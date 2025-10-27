@@ -447,21 +447,51 @@ export default function App() {
     if (!email.trim()) return
     
     setIsSubmitting(true)
+    setError(null)
     
     try {
-      // Simulate API call - replace with actual endpoint
-      await new Promise(resolve => setTimeout(resolve, 1000))
-      console.log('Registration submitted for:', email)
+      const response = await fetch(`${API_BASE_URL}/api/add-to-cmdr-watch-list`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: email.trim()
+        })
+      })
+      
+      if (!response.ok) {
+        // Try to get error message from response
+        let errorMessage = 'Registration failed'
+        try {
+          const data = await response.json()
+          errorMessage = data.message || data.error || errorMessage
+        } catch {
+          // If response is not JSON, use status text
+          errorMessage = response.statusText || errorMessage
+        }
+        throw new Error(errorMessage)
+      }
+      
+      // Check if response has JSON body
+      const contentType = response.headers.get('content-type')
+      if (contentType && contentType.includes('application/json')) {
+        const data = await response.json()
+        console.log('Registration response:', data)
+      } else {
+        console.log('Registration successful (no JSON response)')
+      }
       
       // Close modal and reset form
       setShowRegistrationModal(false)
       setEmail("")
       
-      // You could add a success toast here
-      alert('Registration successful! We\'ll be in touch soon.')
+      // Show success message
+      alert('Thanks for joining! We\'ll be in touch soon.')
     } catch (error) {
       console.error('Registration error:', error)
-      alert('Registration failed. Please try again.')
+      const errorMessage = error instanceof Error ? error.message : 'Registration failed. Please try again.'
+      alert(errorMessage)
     } finally {
       setIsSubmitting(false)
     }
