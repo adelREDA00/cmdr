@@ -473,16 +473,7 @@ export default function App() {
         throw new Error(errorMessage)
       }
       
-      // Check if response has JSON body
-      const contentType = response.headers.get('content-type')
-      if (contentType && contentType.includes('application/json')) {
-        const data = await response.json()
-        console.log('Registration response:', data)
-      } else {
-        console.log('Registration successful (no JSON response)')
-      }
-      
-      // Close modal and reset form
+      // Success - close modal and reset form
       setShowRegistrationModal(false)
       setEmail("")
       
