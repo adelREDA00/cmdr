@@ -20,7 +20,9 @@ interface ClockPosition {
 interface ClockContextType {
   clockPositions: ClockPosition[]
   hasUserSetClocks: boolean
-  addClock: (timezone: TimezoneInfo) => void
+  isInPopoutMode: boolean
+  setPopoutMode: (inPopout: boolean) => void
+  addClock: (timezone: TimezoneInfo, isDefault?: boolean) => void
   removeClock: (id: string) => void
   updateClockPosition: (id: string, updates: Partial<Omit<ClockPosition, 'id'>>) => void
   clearAllClocks: () => void
@@ -33,12 +35,14 @@ const STORAGE_KEY = 'reddit-clock-positions'
 export function ClockProvider({ children }: { children: ReactNode }) {
   const [clockPositions, setClockPositions] = useState<ClockPosition[]>([])
   const [hasUserSetClocks, setHasUserSetClocks] = useState(false)
+  const [isInPopoutMode, setIsInPopoutMode] = useState(false)
 
-  // Load clock positions from localStorage on mount
+  // Load clock positions and popout mode from localStorage on mount
   useEffect(() => {
     try {
       const savedPositions = localStorage.getItem(STORAGE_KEY)
       const hasUserSet = localStorage.getItem('reddit-has-user-set-clocks') === 'true'
+      const inPopout = localStorage.getItem('reddit-clocks-in-popout') === 'true'
       
       if (savedPositions) {
         const positions = JSON.parse(savedPositions)
@@ -52,6 +56,8 @@ export function ClockProvider({ children }: { children: ReactNode }) {
         localStorage.removeItem('reddit-has-user-set-clocks')
         setHasUserSetClocks(false)
       }
+      
+      setIsInPopoutMode(inPopout)
     } catch (error) {
       console.warn('Failed to load clock positions from localStorage:', error)
     }
@@ -66,7 +72,25 @@ export function ClockProvider({ children }: { children: ReactNode }) {
     }
   }, [clockPositions])
 
-  const addClock = (timezone: TimezoneInfo) => {
+  // Listen for storage changes from other windows (for popout communication)
+  useEffect(() => {
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'reddit-clocks-in-popout') {
+        // If newValue is 'true', clocks are in popout
+        // If newValue is null, clocks were returned to main app
+        const inPopout = e.newValue === 'true'
+        setIsInPopoutMode(inPopout)
+      }
+    }
+    
+    window.addEventListener('storage', handleStorageChange)
+    
+    return () => {
+      window.removeEventListener('storage', handleStorageChange)
+    }
+  }, [])
+
+  const addClock = (timezone: TimezoneInfo, isDefault: boolean = false) => {
     // Check if this timezone is already added
     const alreadyExists = clockPositions.some(clock => clock.timezone.name === timezone.name)
     if (alreadyExists) return
@@ -79,9 +103,11 @@ export function ClockProvider({ children }: { children: ReactNode }) {
     }
     
     setClockPositions(prev => [...prev, newClock])
-    // Mark that user has manually set clocks
-    setHasUserSetClocks(true)
-    localStorage.setItem('reddit-has-user-set-clocks', 'true')
+    // Only mark as user-set if it's not a default clock
+    if (!isDefault) {
+      setHasUserSetClocks(true)
+      localStorage.setItem('reddit-has-user-set-clocks', 'true')
+    }
   }
 
   const removeClock = (id: string) => {
@@ -101,10 +127,25 @@ export function ClockProvider({ children }: { children: ReactNode }) {
     setClockPositions([])
   }
 
+  const setPopoutMode = (inPopout: boolean) => {
+    setIsInPopoutMode(inPopout)
+    try {
+      if (inPopout) {
+        localStorage.setItem('reddit-clocks-in-popout', 'true')
+      } else {
+        localStorage.removeItem('reddit-clocks-in-popout')
+      }
+    } catch (error) {
+      console.warn('Failed to save popout mode:', error)
+    }
+  }
+
   return (
     <ClockContext.Provider value={{
       clockPositions,
       hasUserSetClocks,
+      isInPopoutMode,
+      setPopoutMode,
       addClock,
       removeClock,
       updateClockPosition,

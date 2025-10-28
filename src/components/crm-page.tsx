@@ -624,10 +624,10 @@ export function CRMPage() {
                     Chat URL
                   </th>
                   <th className="w-32 h-10 text-left text-sm font-medium text-foreground">
-                    Message Sent
+                    Sent <span className="text-xs text-muted-foreground font-normal">(Y/N)</span>
                   </th>
                   <th className="w-32 h-10 text-left text-sm font-medium text-foreground">
-                    Response
+                    Response <span className="text-xs text-muted-foreground font-normal">(Y/N)</span>
                   </th>
                   <th className="w-12 h-10 text-center text-xs text-muted-foreground"></th>
                 </tr>
@@ -941,12 +941,12 @@ export function CRMPage() {
                     <h3 className="text-xl font-medium text-foreground">Reddit User Analysis</h3>
                   </div>
                   <p className="text-muted-foreground mb-6">Find the best time to DM any Reddit user</p>
-                  <p className="text-sm text-muted-foreground mb-8">
+                  {/* <p className="text-sm text-muted-foreground mb-8">
                     Try: <span className="font-mono bg-muted/50 px-2 py-1 rounded">spez</span>, <span className="font-mono bg-muted/50 px-2 py-1 rounded">gallowboob</span>, or any active Reddit user
-                  </p>
+                  </p> */}
                 </div>
                 
-                <div className="bg-background/95 backdrop-blur-sm border border-border/30 rounded-lg p-6 shadow-lg">
+                <div className="bg-background/95 backdrop-blur-sm  rounded-lg p-6 ">
                   <div className="flex gap-3">
                     <input
                       type="text"
@@ -990,9 +990,7 @@ export function CRMPage() {
                 <span className="text-xs font-medium text-foreground">Reddit User Analysis</span>
               </div>
               <p className="text-xs text-muted-foreground">Find best time to DM any Reddit user</p>
-              <p className="text-xs text-muted-foreground mt-1">
-                Try: spez, gallowboob, or any active Reddit user
-              </p>
+  
             </div>
             <div className="flex gap-2">
               <input

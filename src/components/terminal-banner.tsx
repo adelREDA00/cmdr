@@ -1,6 +1,6 @@
 'use client'
 import { useState, useEffect, useRef } from 'react'
-import { Terminal, AlertTriangle, ChevronUp, Globe, Sun, Moon, BarChart3, Activity } from 'lucide-react'
+import { Terminal, ChevronUp, Globe, Sun, Moon, BarChart3, Info } from 'lucide-react'
 import { useTheme } from './theme-provider'
 import { API_BASE_URL } from '../config'
 
@@ -17,7 +17,7 @@ interface TerminalBannerProps {
   analyzedSubreddit?: string | null
 }
 
-type BannerView = 'charts' | 'shell' | 'logs' | 'health'
+type BannerView = 'charts' | 'shell' | 'info'
 
 // Simple chart data - no complex generation needed
 
@@ -473,26 +473,15 @@ Type "help" for available commands`
              Shell
            </button>
            <button
-             onClick={() => setActiveView('logs')}
+             onClick={() => setActiveView('info')}
              className={`text-xs font-medium transition-all duration-200 ${
-               activeView === 'logs'
+               activeView === 'info'
                  ? 'text-primary'
                  : 'text-muted-foreground hover:text-foreground'
              }`}
            >
-             <Activity className="w-3 h-3 inline mr-1" />
-             Logs
-           </button>
-           <button
-             onClick={() => setActiveView('health')}
-             className={`text-xs font-medium transition-all duration-200 ${
-               activeView === 'health'
-                 ? 'text-primary'
-                 : 'text-muted-foreground hover:text-foreground'
-             }`}
-           >
-             <AlertTriangle className="w-3 h-3 inline mr-1" />
-             Health
+             <Info className="w-3 h-3 inline mr-1" />
+             Info
            </button>
            
            {/* Quick Command Input for Shell view */}
@@ -661,34 +650,140 @@ Type "help" for available commands`
             </>
           )}
 
-          {/* Logs View */}
-          {activeView === 'logs' && (
-            <div className="flex-1 p-4">
-              <div className="h-full bg-background/20 rounded-lg border border-border/20 p-4">
-                <h3 className="text-sm font-medium text-foreground mb-3">System Logs</h3>
-                <div className="h-48 bg-muted/30 rounded border border-border/10 flex items-center justify-center">
-                  <div className="text-center text-muted-foreground">
-                    <Activity className="w-8 h-8 mx-auto mb-2" />
-                    <p className="text-sm">System logs will appear here</p>
-                    <p className="text-xs">Real-time log monitoring</p>
-                  </div>
+          {/* Info View */}
+          {activeView === 'info' && (
+            <div className="flex-1 p-4 overflow-y-auto">
+              <div className="bg-background/20 rounded-lg border border-border/20 p-6">
+                <div className="flex items-center gap-3 mb-6">
+                  <Info className="w-6 h-6 text-primary" />
+                  <h3 className="text-lg font-semibold text-foreground">About This Demo</h3>
                 </div>
-              </div>
-            </div>
-          )}
+                
+                {/* Demo Notice */}
+                <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-4 mb-6">
+                  <p className="text-sm text-foreground font-medium mb-2">
+                    🔒 This is a Demo Version
+                  </p>
+                  <p className="text-xs text-muted-foreground leading-relaxed">
+                    This interactive demo showcases the core interface and features. No data is saved during this demonstration.
+                  </p>
+                </div>
 
-          {/* Health View */}
-          {activeView === 'health' && (
-            <div className="flex-1 p-4">
-              <div className="h-full bg-background/20 rounded-lg border border-border/20 p-4">
-                <h3 className="text-sm font-medium text-foreground mb-3">System Health</h3>
-                <div className="h-48 bg-muted/30 rounded border border-border/10 flex items-center justify-center">
-                  <div className="text-center text-muted-foreground">
-                    <AlertTriangle className="w-8 h-8 mx-auto mb-2" />
-                    <p className="text-sm">Health metrics will appear here</p>
-                    <p className="text-xs">System status monitoring</p>
+                {/* Coming Soon Features */}
+                <div className="mb-6">
+                  <h4 className="text-sm font-semibold text-foreground mb-4 flex items-center gap-2">
+                    <span className="text-primary">✨</span> What's Coming in the Full Version
+                  </h4>
+                  
+                  <div className="grid grid-cols-1 gap-4">
+                    {/* Feature Cards - Ordered by founder appeal */}
+                    <div className="bg-muted/20 border border-border/20 rounded-lg p-4">
+                      <div className="flex items-start gap-3">
+                        <div className="w-8 h-8 bg-primary/10 rounded flex items-center justify-center flex-shrink-0">
+                          <span className="text-primary">✍️</span>
+                        </div>
+                        <div>
+                          <h5 className="text-sm font-semibold text-foreground mb-1">AI Post Optimization Assistant</h5>
+                          <p className="text-xs text-muted-foreground leading-relaxed">
+                            Get AI-powered suggestions for your post titles and content based on what works in each subreddit. Analyze historical data to see what titles get more upvotes, what content formats perform best, and receive actionable tips to maximize your reach.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="bg-muted/20 border border-border/20 rounded-lg p-4">
+                      <div className="flex items-start gap-3">
+                        <div className="w-8 h-8 bg-primary/10 rounded flex items-center justify-center flex-shrink-0">
+                          <span className="text-primary">📊</span>
+                        </div>
+                        <div>
+                          <h5 className="text-sm font-semibold text-foreground mb-1">Enhanced Analytics & Historical Data</h5>
+                          <p className="text-xs text-muted-foreground leading-relaxed">
+                            Track engagement metrics, upvote/downvote ratios, and activity patterns over time. View trends with detailed historical data stored in a database.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="bg-muted/20 border border-border/20 rounded-lg p-4">
+                      <div className="flex items-start gap-3">
+                        <div className="w-8 h-8 bg-primary/10 rounded flex items-center justify-center flex-shrink-0">
+                          <span className="text-primary">🔍</span>
+                        </div>
+                        <div>
+                          <h5 className="text-sm font-semibold text-foreground mb-1">Twitter Integration</h5>
+                          <p className="text-xs text-muted-foreground leading-relaxed">
+                            Add Twitter API support to monitor hashtags, trending topics, and user engagement. Track mentions, retweets, and replies alongside Reddit data.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="bg-muted/20 border border-border/20 rounded-lg p-4">
+                      <div className="flex items-start gap-3">
+                        <div className="w-8 h-8 bg-primary/10 rounded flex items-center justify-center flex-shrink-0">
+                          <span className="text-primary">⚡</span>
+                        </div>
+                        <div>
+                          <h5 className="text-sm font-semibold text-foreground mb-1">Real-Time Updates & Notifications</h5>
+                          <p className="text-xs text-muted-foreground leading-relaxed">
+                            Continuous data polling, automatic refresh of metrics, and custom keyword alerts. Stay updated with live activity from selected subreddits and topics.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="bg-muted/20 border border-border/20 rounded-lg p-4">
+                      <div className="flex items-start gap-3">
+                        <div className="w-8 h-8 bg-primary/10 rounded flex items-center justify-center flex-shrink-0">
+                          <span className="text-primary">🤖</span>
+                        </div>
+                        <div>
+                          <h5 className="text-sm font-semibold text-foreground mb-1">Sentiment Analysis</h5>
+                          <p className="text-xs text-muted-foreground leading-relaxed">
+                            Automatically analyze post and comment sentiment using natural language processing. Categorize content by tone and emotional response.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="bg-muted/20 border border-border/20 rounded-lg p-4">
+                      <div className="flex items-start gap-3">
+                        <div className="w-8 h-8 bg-primary/10 rounded flex items-center justify-center flex-shrink-0">
+                          <span className="text-primary">💻</span>
+                        </div>
+                        <div>
+                          <h5 className="text-sm font-semibold text-foreground mb-1">Terminal Commands for Reddit Data</h5>
+                          <p className="text-xs text-muted-foreground leading-relaxed">
+                            Fast data queries via terminal: "subreddit:programming", "top:24h", "trending:now", "user:activity". Get instant Reddit insights through command-line interface.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="bg-muted/20 border border-border/20 rounded-lg p-4">
+                      <div className="flex items-start gap-3">
+                        <div className="w-8 h-8 bg-primary/10 rounded flex items-center justify-center flex-shrink-0">
+                          <span className="text-primary">🎯</span>
+                        </div>
+                        <div>
+                          <h5 className="text-sm font-semibold text-foreground mb-1">Data Export & Save Options</h5>
+                          <p className="text-xs text-muted-foreground leading-relaxed">
+                            Export charts and metrics to CSV or JSON format. Save your queries and favorite subreddits for quick access. Persist your dashboard preferences.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </div>
+
+                {/* Footer */}
+                {/* <div className="border-t border-border/20 pt-4">
+                  <p className="text-xs text-muted-foreground text-center">
+                    Built with modern web technologies • Bloomberg Terminal-inspired interface • 
+                    <span className="text-primary ml-1">Ready for production deployment</span>
+                  </p>
+                </div> */}
               </div>
             </div>
           )}

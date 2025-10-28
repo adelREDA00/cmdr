@@ -14,8 +14,8 @@ import { DocumentContentProvider } from "./contexts/document-content-state"
 import { CanvasViewProvider } from "./contexts/canvas-view-state"
 import { TaskProvider } from "./contexts/task-state"
 import { CRMProvider } from "./contexts/crm-state"
-import { ClockProvider } from "./contexts/clock-state"
-import { Search, BarChart3, FileText, Clock, MessageSquare, Menu, X } from "lucide-react"
+import { ClockProvider, useClock } from "./contexts/clock-state"
+import { Search, BarChart3, FileText, Clock, MessageSquare, Menu, X, ExternalLink } from "lucide-react"
 import { API_BASE_URL } from "./config"
 
 interface RedditStats {
@@ -384,8 +384,13 @@ export default function App() {
   const [showMobileMenu, setShowMobileMenu] = useState(false)
   const [email, setEmail] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [registrationMessage, setRegistrationMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
   const [currentView, setCurrentView] = useState<'analysis' | 'crm' | 'text-editor' | 'today'>('analysis')
   const isMobile = useIsMobile()
+  
+  // Check if we're in clock-only mode
+  const isClockOnlyMode = typeof window !== 'undefined' && 
+    new URLSearchParams(window.location.search).get('clocks') === 'true'
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -448,6 +453,7 @@ export default function App() {
     
     setIsSubmitting(true)
     setError(null)
+    setRegistrationMessage(null)
     
     try {
       const response = await fetch(`${API_BASE_URL}/api/add-to-cmdr-watch-list`, {
@@ -460,32 +466,78 @@ export default function App() {
         })
       })
       
+      const responseData = await response.json()
+      
       if (!response.ok) {
-        // Try to get error message from response
-        let errorMessage = 'Registration failed'
-        try {
-          const data = await response.json()
-          errorMessage = data.message || data.error || errorMessage
-        } catch {
-          // If response is not JSON, use status text
-          errorMessage = response.statusText || errorMessage
-        }
-        throw new Error(errorMessage)
+        throw new Error(responseData.message || responseData.error || 'Something went wrong. Please try again.')
       }
       
-      // Success - close modal and reset form
-      setShowRegistrationModal(false)
+      // Success
+      setRegistrationMessage({ type: 'success', text: 'Thanks! We\'ll reach out soon about early access and advanced features.' })
       setEmail("")
       
-      // Show success message
-      alert('Thanks for joining! We\'ll be in touch soon.')
+      // Auto-close modal after 2 seconds
+      setTimeout(() => {
+        setShowRegistrationModal(false)
+        setRegistrationMessage(null)
+      }, 2000)
     } catch (error) {
       console.error('Registration error:', error)
-      const errorMessage = error instanceof Error ? error.message : 'Registration failed. Please try again.'
-      alert(errorMessage)
+      const errorMessage = error instanceof Error ? error.message : 'Something went wrong. Please try again.'
+      setRegistrationMessage({ type: 'error', text: errorMessage })
     } finally {
       setIsSubmitting(false)
     }
+  }
+
+  // Clock-only mode - show only clocks
+  const ClockOnlyView = () => {
+    const { setPopoutMode } = useClock()
+    
+    return (
+      <div className="w-full min-h-screen bg-background overflow-hidden">
+        {/* Return to Main App Banner */}
+        <div 
+          className="fixed top-0 left-0 right-0 z-50 group cursor-pointer border-b border-border/20"
+          onClick={() => {
+            // Remove the popout mode flag from localStorage
+            // This will signal the main window to restore clocks via storage listener
+            try {
+              localStorage.removeItem('reddit-clocks-in-popout')
+              setPopoutMode(false)
+              // Close the popout window
+              window.close()
+            } catch (e) {
+              console.error('Failed to update localStorage:', e)
+            }
+          }}
+          title="Return to main app"
+        >
+          <div className="flex items-center gap-3 px-3 py-2 hover:bg-background/5 transition-all duration-150 h-10 bg-background/95 backdrop-blur-sm">
+            <ExternalLink className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
+            <span className="text-sm text-muted-foreground group-hover:text-primary transition-colors">
+              Return to Main
+            </span>
+          </div>
+        </div>
+        <BloombergClockSystem 
+          showSettings={showClockSettings} 
+          onSettingsChange={setShowClockSettings} 
+        />
+      </div>
+    )
+  }
+  
+  if (isClockOnlyMode) {
+    return (
+      <TaskProvider>
+        <CRMProvider>
+          <ClockProvider>
+            <ClockOnlyView />
+          </ClockProvider>
+        </CRMProvider>
+      </TaskProvider>
+    )
   }
 
   return (
@@ -565,14 +617,17 @@ export default function App() {
               </button>
               
               <button
-                onClick={() => setShowRegistrationModal(true)}
+                onClick={() => {
+                  setShowRegistrationModal(true)
+                  setRegistrationMessage(null)
+                }}
                 className="text-xs sm:text-sm font-medium text-primary hover:text-primary/80 transition-colors duration-200 underline decoration-primary/60 hover:decoration-primary/80 flex items-center gap-1 relative group"
               >
                 <span className="relative">
                   <span className="absolute inset-0 bg-gradient-to-t from-orange-500/40 to-transparent "></span>
                   <span className="relative flex items-center gap-1">
-                    <span className="hidden sm:inline"> Join the Beta</span>
-                    <span className="sm:hidden">Beta</span>
+                    <span className="hidden sm:inline">Get Early Access</span>
+                    <span className="sm:hidden">Get Early Access</span>
                     <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
                     </svg>
@@ -728,10 +783,12 @@ export default function App() {
 
       {/* Bloomberg Clock System */}
       {currentView !== 'text-editor' && (
-        <BloombergClockSystem 
-          showSettings={showClockSettings} 
-          onSettingsChange={setShowClockSettings} 
-        />
+        <>
+          <BloombergClockSystem 
+            showSettings={showClockSettings} 
+            onSettingsChange={setShowClockSettings} 
+          />
+        </>
       )}
 
       {/* Todo App - Desktop Only */}
@@ -821,9 +878,12 @@ export default function App() {
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-background border border-border/20 rounded-xl shadow-xl max-w-md w-full p-6">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold text-foreground">Join the Beta</h2>
+              <h2 className="text-lg font-semibold text-foreground">Get Early Access</h2>
               <button
-                onClick={() => setShowRegistrationModal(false)}
+                onClick={() => {
+                  setShowRegistrationModal(false)
+                  setRegistrationMessage(null)
+                }}
                 className="text-muted-foreground hover:text-foreground transition-colors duration-200"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -832,52 +892,86 @@ export default function App() {
               </button>
             </div>
             
-            <p className="text-sm text-muted-foreground mb-6">
-              Get early access to our advanced Reddit analytics platform. Be the first to discover optimal posting times for any subreddit.
-            </p>
-            
-            <form onSubmit={handleRegistrationSubmit} className="space-y-4">
-              <div>
-                <label htmlFor="email" className="block text-sm font-medium text-foreground mb-2">
-                  Email Address
-                </label>
-                <input
-                  type="email"
-                  id="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="Enter your email address"
-                  className="w-full px-3 py-2 bg-background/50 border border-border/50 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50 transition-all duration-200 placeholder:text-muted-foreground/60"
-                  required
-                  disabled={isSubmitting}
-                />
-              </div>
-              
-              <div className="flex gap-3 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setShowRegistrationModal(false)}
-                  className="flex-1 px-4 py-2 text-sm font-medium text-muted-foreground hover:text-foreground border border-border/50 rounded-lg transition-all duration-200 hover:bg-muted/30"
-                  disabled={isSubmitting}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={!email.trim() || isSubmitting}
-                  className="flex-1 px-4 py-2 bg-primary text-primary-foreground rounded-lg font-medium transition-all duration-200 hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {isSubmitting ? (
-                    <div className="flex items-center justify-center gap-2">
-                      <div className="w-4 h-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin"></div>
-                      Registering...
-                    </div>
+            {/* Message Display */}
+            {registrationMessage && (
+              <div className={`mb-4 p-3 rounded-lg ${
+                registrationMessage.type === 'success' 
+                  ? 'bg-green-500/10 border border-green-500/20 text-green-600 dark:text-green-400' 
+                  : 'bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400'
+              }`}>
+                <div className="flex items-center gap-2">
+                  {registrationMessage.type === 'success' ? (
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
                   ) : (
-                    'Register'
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
                   )}
-                </button>
+                  <span className="text-sm font-medium">{registrationMessage.text}</span>
+                </div>
               </div>
-            </form>
+            )}
+            
+            {!registrationMessage && (
+              <div className="space-y-3 mb-6">
+                <p className="text-sm text-foreground">
+                  You're viewing a <span className="font-medium text-primary">demo version</span> of our Reddit analytics platform.
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  If you like what you see, leave your email and we'll reach out with advanced features and early access to the full platform.
+                </p>
+              </div>
+            )}
+            
+            {!registrationMessage && (
+              <form onSubmit={handleRegistrationSubmit} className="space-y-4">
+                <div>
+                  <label htmlFor="email" className="block text-sm font-medium text-foreground mb-2">
+                    Email Address
+                  </label>
+                  <input
+                    type="email"
+                    id="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="Enter your email address"
+                    className="w-full px-3 py-2 bg-background/50 border border-border/50 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50 transition-all duration-200 placeholder:text-muted-foreground/60"
+                    required
+                    disabled={isSubmitting}
+                  />
+                </div>
+                
+                <div className="flex gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowRegistrationModal(false)
+                      setRegistrationMessage(null)
+                    }}
+                    className="flex-1 px-4 py-2 text-sm font-medium text-muted-foreground hover:text-foreground border border-border/50 rounded-lg transition-all duration-200 hover:bg-muted/30"
+                    disabled={isSubmitting}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={!email.trim() || isSubmitting}
+                    className="flex-1 px-4 py-2 bg-primary text-primary-foreground rounded-lg font-medium transition-all duration-200 hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isSubmitting ? (
+                      <div className="flex items-center justify-center gap-2">
+                        <div className="w-4 h-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin"></div>
+                        Sending...
+                      </div>
+                    ) : (
+                      'Get Notified'
+                    )}
+                  </button>
+                </div>
+              </form>
+            )}
           </div>
         </div>
       )}

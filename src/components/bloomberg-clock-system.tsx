@@ -1,6 +1,6 @@
 'use client'
 import { useState, useEffect, useRef } from 'react'
-import { Clock, Globe, Plus, X, Search, Minus } from 'lucide-react'
+import { Clock, Globe, Plus, X, Search, Minus, ExternalLink } from 'lucide-react'
 import { useIsMobile } from '../hooks/use-mobile'
 import { useClock } from '../contexts/clock-state'
 
@@ -242,11 +242,23 @@ interface BloombergClockSystemProps {
 }
 
 export function BloombergClockSystem({ showSettings: externalShowSettings, onSettingsChange }: BloombergClockSystemProps) {
-  const { clockPositions, addClock, removeClock, hasUserSetClocks } = useClock()
+  const { clockPositions, addClock, removeClock, hasUserSetClocks, isInPopoutMode, setPopoutMode } = useClock()
   const [currentTime, setCurrentTime] = useState(new Date())
-  const isMobile = useIsMobile()
+  const baseIsMobile = useIsMobile()
   const [internalShowSettings, setInternalShowSettings] = useState(false)
   const hasAddedDefaults = useRef(false)
+  const prevClockCount = useRef(clockPositions.length)
+  
+  // Check if we're in clock-only mode (popout window with ?clocks=true)
+  const isClockOnlyMode = typeof window !== 'undefined' && 
+    new URLSearchParams(window.location.search).get('clocks') === 'true'
+  
+  // Hide clocks on main app if they're in a popout window
+  // But always show clocks in the popout window itself
+  const shouldHideClocks = !isClockOnlyMode && isInPopoutMode
+  
+  // In clock-only mode, always use desktop layout (vertical stack)
+  const isMobile = isClockOnlyMode ? false : baseIsMobile
   
   // Use external settings state if provided, otherwise use internal state
   const showSettings = externalShowSettings !== undefined ? externalShowSettings : internalShowSettings
@@ -254,10 +266,24 @@ export function BloombergClockSystem({ showSettings: externalShowSettings, onSet
   const [searchQuery, setSearchQuery] = useState('')
   const [searchResults, setSearchResults] = useState<TimezoneInfo[]>([])
 
+  // Reset hasAddedDefaults flag when all clocks are removed
+  useEffect(() => {
+    const prevCount = prevClockCount.current
+    const currentCount = clockPositions.length
+    
+    // If we went from having clocks to having none, reset the flag
+    if (prevCount > 0 && currentCount === 0) {
+      hasAddedDefaults.current = false
+    }
+    
+    prevClockCount.current = currentCount
+  }, [clockPositions.length])
+
   // Auto-detect user's timezone and add default clocks if none exist
   useEffect(() => {
     // Add default clocks if none exist and we haven't added them yet
-    if (clockPositions.length === 0 && !hasAddedDefaults.current && !hasUserSetClocks) {
+    // Always add defaults if no clocks exist (regardless of hasUserSetClocks flag)
+    if (clockPositions.length === 0 && !hasAddedDefaults.current) {
       const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone
       const userOffset = new Date().getTimezoneOffset() / 60
       
@@ -284,23 +310,22 @@ export function BloombergClockSystem({ showSettings: externalShowSettings, onSet
         }
       }
       
-      // Add default clocks
+      // Add default clocks (3 total: local time + 2 major cities)
       const defaultClocks = [
         detectedTimezone!,
         MAJOR_CITIES.find(tz => tz.city === 'New York') || MAJOR_CITIES[0],
-        MAJOR_CITIES.find(tz => tz.city === 'London') || MAJOR_CITIES[3],
-        MAJOR_CITIES.find(tz => tz.city === 'Tokyo') || MAJOR_CITIES[6]
+        MAJOR_CITIES.find(tz => tz.city === 'London') || MAJOR_CITIES[3]
       ]
       
       // Add each default clock
       defaultClocks.forEach(timezone => {
         if (timezone) {
-          addClock(timezone)
+          addClock(timezone, true) // Pass true for isDefault
         }
       })
       hasAddedDefaults.current = true
     }
-  }, [clockPositions.length, addClock, hasUserSetClocks])
+  }, [clockPositions.length, addClock])
 
   // Search functionality
   useEffect(() => {
@@ -373,32 +398,59 @@ export function BloombergClockSystem({ showSettings: externalShowSettings, onSet
     setSearchQuery('') // Clear search after adding
   }
 
+  const openClockPopout = () => {
+    const width = 285 // Clocks are max 280px, plus minimal padding
+    const height = window.innerHeight
+    const left = window.screenX + window.outerWidth - width
+    const top = window.screenY
+    const url = `${window.location.origin}${window.location.pathname}?clocks=true`
+    
+    // Set popout mode to hide clocks on main app
+    setPopoutMode(true)
+    
+    window.open(url, 'ClockPopout', `width=${width},height=${height},left=${left},top=${top},resizable=yes,scrollbars=no,toolbar=no,menubar=no,location=no`)
+  }
+  
+  // If we're in popout mode on the main app, show a restore button instead of the clocks
+  if (shouldHideClocks) {
+    return (
+      <div 
+        className="fixed z-[45] group cursor-pointer left-3"
+        style={{ top: '60px' }}
+        onClick={() => setPopoutMode(false)}
+        title="Restore clocks to this window"
+      >
+        <div className="flex items-center gap-3 px-3 py-2 border-b border-border/20 hover:bg-background/5 transition-all duration-150 w-56 h-10">
+          <ExternalLink className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
+          <span className="text-sm text-muted-foreground group-hover:text-primary transition-colors">
+            Restore Clocks
+          </span>
+        </div>
+      </div>
+    )
+  }
 
-  const getPositionClasses = (_index: number, size: ClockPosition['size'], isMobile: boolean) => {
-    if (isMobile) {
-      // Mobile: horizontal layout at the top
-      return "flex items-center gap-2 px-2 py-1 bg-background/95 backdrop-blur-sm border border-border/20 rounded text-xs"
-    } else {
-      // Desktop: vertical layout on the left
-      const baseClasses = "fixed z-[45] left-3"
-      const sizeClasses = {
-        small: "text-sm",
-        medium: "text-base", 
-        large: "text-lg"
-      }
-      return `${baseClasses} ${sizeClasses[size]}`
+
+  const getPositionClasses = (size: ClockPosition['size']) => {
+    const sizeClasses = {
+      small: "text-sm",
+      medium: "text-base", 
+      large: "text-lg"
     }
+    return sizeClasses[size]
   }
 
   const ClockComponent = ({ clock, index }: { clock: ClockPosition, index: number }) => {
     const timezoneTime = getTimezoneTime(clock.timezone)
-    const positionClasses = getPositionClasses(index, clock.size, isMobile)
-    const topOffset = 60 + (index * 48) // 60px to start below nav bar (48px nav + 12px margin) + 48px per clock
+    // In clock-only mode, start below the banner (50px). Otherwise, account for nav bar (60px)
+    const topOffset = (isClockOnlyMode ? 50 : 60) + (index * 48)
+    const leftPosition = isClockOnlyMode ? 8 : 12
     
     if (isMobile) {
       // Mobile layout: thin horizontal line
+      const mobileClasses = "flex items-center gap-2 px-2 py-1 bg-background/95 backdrop-blur-sm border border-border/20 rounded text-xs"
       return (
-        <div className={`${positionClasses} group min-w-fit flex-shrink-0 hover:bg-background transition-colors`}>
+        <div className={`${mobileClasses} group min-w-fit flex-shrink-0 hover:bg-background transition-colors`}>
           <Clock className="w-3 h-3 text-muted-foreground flex-shrink-0" />
           <div className="flex items-center gap-1 min-w-0 whitespace-nowrap">
             <span className="font-mono font-medium text-xs whitespace-nowrap">
@@ -416,9 +468,15 @@ export function BloombergClockSystem({ showSettings: externalShowSettings, onSet
       )
     } else {
       // Desktop layout: vertical stack on the left
+      // In clock-only mode, make clocks narrower to fit the popout window
+      const clockWidth = isClockOnlyMode ? 'w-full max-w-[280px]' : 'w-56'
+      const positionClasses = getPositionClasses(clock.size)
       return (
-        <div className={`${positionClasses} group`} style={{ top: `${topOffset}px` }}>
-          <div className="flex items-center gap-3 px-3 py-2 border-b border-border/20 hover:bg-background/5 transition-colors duration-200 w-56 h-10">
+        <div 
+          className={`fixed z-[45] ${positionClasses} group`} 
+          style={{ top: `${topOffset}px`, left: `${leftPosition}px` }}
+        >
+          <div className={`flex items-center gap-3 px-3 py-2 border-b border-border/20 hover:bg-background/5 transition-colors duration-200 ${clockWidth} h-10`}>
             <Clock className="w-4 h-4 text-muted-foreground" />
             <div className="flex items-center gap-2 flex-1 min-w-0 whitespace-nowrap">
               <span className="font-mono font-medium text-xs whitespace-nowrap">
@@ -464,6 +522,17 @@ export function BloombergClockSystem({ showSettings: externalShowSettings, onSet
               {clockPositions.map((clock, index) => (
                 <ClockComponent key={clock.id} clock={clock} index={index} />
               ))}
+              {/* Pop-out button for mobile - only show in normal mode, not in popout */}
+              {!isClockOnlyMode && clockPositions.length > 0 && (
+                <button
+                  onClick={openClockPopout}
+                  className="flex-shrink-0 flex items-center gap-1 px-2 py-1 bg-background/95 backdrop-blur-sm border border-border/20 rounded text-xs hover:bg-background transition-colors ml-1"
+                  title="Pop-out clocks in new window"
+                >
+                  <ExternalLink className="w-3 h-3" />
+                  <span className="hidden sm:inline">Pop-out</span>
+                </button>
+              )}
               {/* Add some padding at the end for better scrolling experience */}
               <div className="flex-shrink-0 w-2"></div>
             </div>
@@ -479,24 +548,44 @@ export function BloombergClockSystem({ showSettings: externalShowSettings, onSet
           ))}
           {/* Add Clock Button */}
           <div 
-            className="fixed z-[45] left-3 group cursor-pointer"
-            style={{ top: `${60 + (clockPositions.length * 48)}px` }}
+            className="fixed z-[45] group cursor-pointer"
+            style={{ 
+              top: `${(isClockOnlyMode ? 50 : 60) + (clockPositions.length * 48)}px`,
+              left: isClockOnlyMode ? '8px' : '12px'
+            }}
             onClick={() => setShowSettings(true)}
           >
-            <div className="flex items-center gap-3 px-3 py-2 border-b border-border/20 hover:bg-background/5 transition-all duration-150 w-56 h-10">
+            <div className={`flex items-center gap-3 px-3 py-2 border-b border-border/20 hover:bg-background/5 transition-all duration-150 ${isClockOnlyMode ? 'w-full max-w-[280px]' : 'w-56'} h-10`}>
               <Plus className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
               <span className="text-sm text-muted-foreground group-hover:text-primary transition-colors">
                 Add Clock
               </span>
             </div>
           </div>
+          
+          {/* Pop-out Button - only show in normal mode, not in popout */}
+          {!isClockOnlyMode && clockPositions.length > 0 && (
+            <div 
+              className="fixed z-[45] left-3 group cursor-pointer"
+              style={{ top: `${108 + (clockPositions.length * 48)}px` }}
+              onClick={openClockPopout}
+              title="Pop-out clocks in new window"
+            >
+              <div className="flex items-center gap-3 px-3 py-2 border-b border-border/20 hover:bg-background/5 transition-all duration-150 w-56 h-10">
+                <ExternalLink className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
+                <span className="text-sm text-muted-foreground group-hover:text-primary transition-colors">
+                  Pop-out Clocks
+                </span>
+              </div>
+            </div>
+          )}
         </>
       )}
 
       {/* Settings Panel */}
       {showSettings && (
         <div className="fixed inset-0 bg-black/20 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-card border border-border/30 rounded-xl p-6 max-w-lg w-full max-h-[80vh] overflow-y-auto">
+          <div className={`bg-card border border-border/30 rounded-xl p-6 ${isClockOnlyMode ? 'max-w-[300px]' : 'max-w-lg'} w-full max-h-[80vh] overflow-y-auto`}>
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-medium">Clock Configuration</h3>
               <button
